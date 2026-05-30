@@ -1,0 +1,19 @@
+name: ETF Monitor
+on:
+  schedule:
+    - cron: '*/10 2-6 * * 1-5'
+  workflow_dispatch:
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r worker/requirements.txt
+      - run: python worker/main.py
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+          PUSHDEER_KEY: ${{ secrets.PUSHDEER_KEY }}

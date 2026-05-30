@@ -1,0 +1,6 @@
+akshare
+firebase-admin
+requests
+chinese-calendar
+pytest
+pytest-mock
