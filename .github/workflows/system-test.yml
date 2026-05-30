@@ -62,14 +62,14 @@ jobs:
 
           # ST-05: Worker 完整流程（绕过时间检查）
           logger.info('--- ST-05: Worker 完整流程测试 ---')
-          from worker.market_data import fetch_quotes
+          from worker.market_data import fetch_etf_quotes
           from worker.threshold import check_threshold
           from worker.notifier import send_pushdeer
           from datetime import datetime
 
           # 获取真实行情
           fund_codes = [f['code'] for f in config_data['funds']]
-          quotes = fetch_quotes(fund_codes)
+          quotes = fetch_etf_quotes(fund_codes)
           logger.info('ST-05: 获取到 %d 只基金行情', len(quotes))
 
           for code, q in quotes.items():
