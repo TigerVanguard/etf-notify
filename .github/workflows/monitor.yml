@@ -1,8 +1,10 @@
 name: ETF Monitor
+
 on:
   schedule:
     - cron: '*/10 2-6 * * 1-5'
-  workflow_dispatch:
+  workflow_dispatch: {}
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
