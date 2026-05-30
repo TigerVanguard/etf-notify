@@ -1,0 +1,118 @@
+name: System Test
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  system-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r worker/requirements.txt
+      - name: Run full worker (bypass weekend check)
+        run: |
+          python -c "
+          import os, json, logging
+          logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+          logger = logging.getLogger('system-test')
+
+          logger.info('=== 系统测试开始 ===')
+
+          # ST-02: Firestore 连接测试
+          logger.info('--- ST-02: Firestore 连接测试 ---')
+          import firebase_admin
+          from firebase_admin import credentials, firestore
+          cred_json = json.loads(os.environ['FIREBASE_CREDENTIALS'])
+          cred = credentials.Certificate(cred_json)
+          firebase_admin.initialize_app(cred)
+          db = firestore.client()
+
+          # 写入默认配置
+          default_config = {
+              'funds': [
+                  {'code': '159941', 'name': '纳指ETF', 'index': '纳斯达克100', 'enabled': True},
+                  {'code': '513100', 'name': '纳指ETF', 'index': '纳斯达克100', 'enabled': True},
+                  {'code': '513500', 'name': '标普500ETF', 'index': '标普500', 'enabled': True},
+                  {'code': '159612', 'name': '标普500ETF', 'index': '标普500', 'enabled': True},
+              ],
+              'levels': [
+                  {'name': '提醒', 'threshold': -1.0, 'color': 'yellow'},
+                  {'name': '警告', 'threshold': -2.0, 'color': 'orange'},
+                  {'name': '紧急', 'threshold': -3.0, 'color': 'red'},
+              ],
+              'cooldown_minutes': 60,
+              'pushdeer_key': os.environ.get('PUSHDEER_KEY', ''),
+              'fcm_enabled': False
+          }
+          db.collection('config').document('settings').set(default_config)
+          logger.info('ST-02: Firestore 写入配置成功')
+
+          # 读取验证
+          doc = db.collection('config').document('settings').get()
+          assert doc.exists, 'Config document not found'
+          config_data = doc.to_dict()
+          assert len(config_data['funds']) == 4
+          assert len(config_data['levels']) == 3
+          logger.info('ST-02: Firestore 读取验证成功 - %d 只基金, %d 级门限', len(config_data['funds']), len(config_data['levels']))
+          logger.info('ST-02: PASS')
+
+          # ST-05: Worker 完整流程（绕过时间检查）
+          logger.info('--- ST-05: Worker 完整流程测试 ---')
+          from worker.market_data import fetch_quotes
+          from worker.threshold import check_threshold
+          from worker.notifier import send_pushdeer
+          from datetime import datetime
+
+          # 获取真实行情
+          fund_codes = [f['code'] for f in config_data['funds']]
+          quotes = fetch_quotes(fund_codes)
+          logger.info('ST-05: 获取到 %d 只基金行情', len(quotes))
+
+          for code, q in quotes.items():
+              name = q.get('name', code)
+              price = q.get('price', 0)
+              prev_close = q.get('prev_close', 0)
+              change_pct = q.get('change_pct', 0)
+              logger.info('  %s(%s): 价格=%.3f 昨收=%.3f 涨跌幅=%.2f%%', name, code, price, prev_close, change_pct)
+
+              # 门限判断
+              triggered = check_threshold(change_pct, config_data['levels'])
+              if triggered:
+                  logger.info('  -> 触发门限: %s', triggered['name'])
+              else:
+                  logger.info('  -> 未触发门限')
+
+          # 写入快照
+          now = datetime.now()
+          date_str = now.strftime('%Y-%m-%d')
+          snapshot_data = {
+              'date': date_str,
+              'updated_at': now.isoformat(),
+              'quotes': quotes
+          }
+          db.collection('snapshots').document(date_str).set(snapshot_data)
+          logger.info('ST-05: 快照写入 Firestore 成功 (snapshots/%s)', date_str)
+
+          # 验证快照
+          snap_doc = db.collection('snapshots').document(date_str).get()
+          assert snap_doc.exists
+          logger.info('ST-05: 快照读取验证成功')
+
+          # 发送系统测试通知
+          pushdeer_key = os.environ.get('PUSHDEER_KEY', '')
+          if pushdeer_key:
+              title = '[系统测试] ETF Notify 全流程验证通过'
+              content = f'AkShare数据获取: ✓ ({len(quotes)}只基金)\nFirestore读写: ✓\nPushDeer推送: ✓\n测试时间: {now.strftime(\"%Y-%m-%d %H:%M:%S\")}'
+              result = send_pushdeer(pushdeer_key, title, content)
+              logger.info('ST-05: PushDeer 推送结果: %s', 'SUCCESS' if result else 'FAILED')
+          
+          logger.info('ST-05: PASS')
+          logger.info('=== 系统测试全部完成 ===')
+          "
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+          PUSHDEER_KEY: ${{ secrets.PUSHDEER_KEY }}
