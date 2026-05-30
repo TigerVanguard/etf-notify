@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+dist/
+.env
+.env.local
+.env.*.local
+*.pyc
+__pycache__/
+.venv/
+venv/
+*.egg-info/
+.firebase/
+firebase-debug.log
+.vercel
+.DS_Store
+Thumbs.db
