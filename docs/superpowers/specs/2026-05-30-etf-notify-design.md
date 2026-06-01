@@ -286,6 +286,8 @@ jobs:
 | TC-08 | 配置变更 | 前端修改门限后 Worker 即时生效 | 修改 Firestore → 运行 Worker |
 | TC-09 | PWA 仪表盘 | 数据正确展示在前端 | Worker 写入后检查页面 |
 | TC-10 | 端到端真实 | 真实环境完整跑通 | 手动触发 workflow，验证手机收到通知 |
+| TC-11 | 部署后 Firestore 连通性 | CI 部署后前端能实际连接 Firestore | 部署完成后请求页面，验证 Firebase 配置非 undefined 且 Firestore API 可达 |
+| TC-12 | 部署后路由完整性 | 各页面返回正确内容（非 SPA 回退） | 部署后检查 /settings/ 返回内容与 / 不同 |
 
 ## 8. 技术依赖
 
