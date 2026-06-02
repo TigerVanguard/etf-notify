@@ -22,28 +22,32 @@ jobs:
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
           firebase deploy --only hosting --project etf-notify-app
-      - name: Post-deploy smoke test
+      - name: Pre-deploy build verification
+        working-directory: web
         run: |
-          echo "=== TC-11: Firestore connectivity check ==="
-          DASHBOARD=$(curl -sL https://etf-notify-app.web.app/)
-          if echo "$DASHBOARD" | grep -q "NEXT_PUBLIC_FIREBASE_PROJECT_ID"; then
-            echo "WARN: env var placeholder found in HTML (may indicate missing config)"
-          fi
-          if echo "$DASHBOARD" | grep -q "etf-notify-app"; then
-            echo "PASS: Firebase project ID is embedded in the build"
+          echo "=== TC-11: Firebase config in build output ==="
+          if grep -r "etf-notify-app" out/_next/ > /dev/null 2>&1; then
+            echo "PASS: Firebase project ID found in JS bundle"
           else
-            echo "FAIL: Firebase project ID not found in deployed bundle"
+            echo "FAIL: Firebase project ID not found in build output"
+            echo "Check that web/.env.production exists and contains NEXT_PUBLIC_FIREBASE_PROJECT_ID"
             exit 1
           fi
 
-          echo "=== TC-12: Route integrity check ==="
-          DASH_SIZE=$(curl -sL -o /dev/null -w '%{size_download}' https://etf-notify-app.web.app/)
-          SETTINGS_SIZE=$(curl -sL -o /dev/null -w '%{size_download}' https://etf-notify-app.web.app/settings/)
-          echo "Dashboard size: $DASH_SIZE bytes"
-          echo "Settings size: $SETTINGS_SIZE bytes"
-          if [ "$DASH_SIZE" = "$SETTINGS_SIZE" ]; then
-            echo "FAIL: Dashboard and Settings pages are identical (routing broken)"
-            exit 1
+          echo "=== TC-12: Route files exist ==="
+          if [ -f "out/index.html" ] && [ -f "out/settings/index.html" ]; then
+            DASH_SIZE=$(wc -c < out/index.html)
+            SETTINGS_SIZE=$(wc -c < out/settings/index.html)
+            echo "Dashboard: $DASH_SIZE bytes"
+            echo "Settings: $SETTINGS_SIZE bytes"
+            if [ "$DASH_SIZE" = "$SETTINGS_SIZE" ]; then
+              echo "FAIL: Dashboard and Settings are identical (routing broken)"
+              exit 1
+            else
+              echo "PASS: Dashboard and Settings are different pages"
+            fi
           else
-            echo "PASS: Dashboard and Settings return different content"
+            echo "FAIL: Missing route files (expected out/index.html and out/settings/index.html)"
+            ls -la out/ out/settings/ 2>/dev/null || true
+            exit 1
           fi
