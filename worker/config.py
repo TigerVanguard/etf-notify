@@ -44,7 +44,7 @@ def init_firebase():
 
 
 def load_config(db=None):
-    """Load configuration from Firestore, falling back to defaults."""
+    """Load configuration from Firestore, creating defaults if none exist."""
     if db is None:
         db = firestore.client()
 
@@ -59,6 +59,12 @@ def load_config(db=None):
             return config
     except Exception:
         logger.exception("读取 Firestore 配置失败，使用默认配置")
+        return dict(DEFAULT_CONFIG)
 
-    logger.info("Firestore 无配置，使用默认配置")
+    logger.info("Firestore 无配置，写入默认配置")
+    try:
+        db.collection("config").document("settings").set(DEFAULT_CONFIG)
+        logger.info("默认配置已写入 Firestore")
+    except Exception:
+        logger.exception("写入默认配置到 Firestore 失败")
     return dict(DEFAULT_CONFIG)

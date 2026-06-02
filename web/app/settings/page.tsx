@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [pushDeerKey, setPushDeerKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -28,8 +29,12 @@ export default function SettingsPage() {
       const cfg = await getConfig();
       setConfig(cfg);
       setPushDeerKey(cfg?.pushdeer_key ?? "");
+      if (!cfg) {
+        setError("not_initialized");
+      }
     } catch (err) {
       console.error("Failed to load config:", err);
+      setError("connection_failed");
     } finally {
       setLoading(false);
     }
@@ -121,11 +126,29 @@ export default function SettingsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen px-4">
         <div className="text-center">
-          <div className="text-4xl mb-4">⚙️</div>
-          <p className="text-slate-300 text-base mb-2">配置未初始化</p>
-          <p className="text-slate-400 text-sm">
-            请先通过 Worker 初始化 Firestore 配置
-          </p>
+          {error === "connection_failed" ? (
+            <>
+              <div className="text-4xl mb-4">📡</div>
+              <p className="text-slate-300 text-base mb-2">无法连接到数据库</p>
+              <p className="text-slate-400 text-sm">
+                请检查网络连接，或稍后重试
+              </p>
+              <button
+                onClick={() => { setLoading(true); setError(null); loadConfig(); }}
+                className="mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors"
+              >
+                重试
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="text-4xl mb-4">⚙️</div>
+              <p className="text-slate-300 text-base mb-2">配置未初始化</p>
+              <p className="text-slate-400 text-sm">
+                请等待 Worker 首次运行自动创建配置（工作日 10:00~14:30）
+              </p>
+            </>
+          )}
         </div>
       </div>
     );
