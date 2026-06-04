@@ -2,7 +2,11 @@ name: ETF Monitor
 
 on:
   schedule:
-    - cron: '*/10 2-6 * * 1-5'
+    # UTC 02:03~05:53 = Beijing 10:03~13:53.
+    # Offset from :00/:10 boundaries to reduce GitHub schedule delays/drops.
+    - cron: '3,13,23,33,43,53 2-5 * * 1-5'
+    # UTC 06:03~06:23 = Beijing 14:03~14:23.
+    - cron: '3,13,23 6 * * 1-5'
   workflow_dispatch: {}
 
 jobs:
