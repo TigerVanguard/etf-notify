@@ -6,6 +6,55 @@ logger = logging.getLogger(__name__)
 TZ_BEIJING = timezone(timedelta(hours=8))
 
 
+def _parse_timestamp(value):
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=TZ_BEIJING)
+    return value
+
+
+def _latest_notification_from_docs(docs, level_name: str) -> dict | None:
+    notifications = []
+    for doc in docs:
+        item = doc.to_dict()
+        if item.get("level") != level_name:
+            continue
+        timestamp = item.get("timestamp")
+        if not timestamp:
+            continue
+        notifications.append((item, _parse_timestamp(timestamp)))
+
+    if not notifications:
+        return None
+
+    notifications.sort(key=lambda item: item[1], reverse=True)
+    return notifications[0][0]
+
+
+def _load_latest_notification(fund_code: str, level_name: str, db) -> dict | None:
+    query = (
+        db.collection("notifications")
+        .where("fund_code", "==", fund_code)
+        .where("level", "==", level_name)
+        .order_by("timestamp", direction="DESCENDING")
+        .limit(1)
+    )
+    docs = list(query.stream())
+    if docs:
+        return docs[0].to_dict()
+    return None
+
+
+def _load_latest_notification_without_composite_index(
+    fund_code: str,
+    level_name: str,
+    db,
+) -> dict | None:
+    query = db.collection("notifications").where("fund_code", "==", fund_code)
+    return _latest_notification_from_docs(query.stream(), level_name)
+
+
 def is_in_cooldown(
     fund_code: str,
     level_name: str,
@@ -14,24 +63,32 @@ def is_in_cooldown(
 ) -> bool:
     """Check whether a notification for this fund+level is still in cooldown."""
     try:
-        query = (
-            db.collection("notifications")
-            .where("fund_code", "==", fund_code)
-            .where("level", "==", level_name)
-            .order_by("timestamp", direction="DESCENDING")
-            .limit(1)
+        last_notification = _load_latest_notification(fund_code, level_name, db)
+    except Exception:
+        logger.warning(
+            "复合索引冷却查询失败（基金 %s），尝试单字段 fallback 查询",
+            fund_code,
+            exc_info=True,
         )
-        docs = list(query.stream())
-        if not docs:
-            return False
+        try:
+            last_notification = _load_latest_notification_without_composite_index(
+                fund_code,
+                level_name,
+                db,
+            )
+        except Exception:
+            logger.warning(
+                "检查冷却时间 fallback 失败（基金 %s），返回冷却中以防刷屏",
+                fund_code,
+                exc_info=True,
+            )
+            return True
 
-        last_notification = docs[0].to_dict()
-        last_ts = last_notification.get("timestamp")
+    if not last_notification:
+        return False
 
-        if isinstance(last_ts, str):
-            last_ts = datetime.fromisoformat(last_ts)
-        if last_ts.tzinfo is None:
-            last_ts = last_ts.replace(tzinfo=TZ_BEIJING)
+    try:
+        last_ts = _parse_timestamp(last_notification.get("timestamp"))
 
         now = datetime.now(TZ_BEIJING)
         elapsed = now - last_ts
@@ -46,9 +103,7 @@ def is_in_cooldown(
         return False
     except Exception:
         logger.warning(
-            "检查冷却时间失败（基金 %s），返回冷却中以防刷屏。"
-            "若持续出现，请检查 Firestore 复合索引是否已创建"
-            "（fund_code ASC + level ASC + timestamp DESC）",
+            "解析冷却时间失败（基金 %s），返回冷却中以防刷屏",
             fund_code,
             exc_info=True,
         )

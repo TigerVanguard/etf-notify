@@ -111,6 +111,44 @@ class TestIsInCooldownExpired:
         assert result is False
 
 
+class TestIsInCooldownIndexFallback:
+    """Fallback query should handle missing composite Firestore indexes."""
+
+    @patch("cooldown.datetime")
+    def test_missing_composite_index_falls_back_to_single_field_query(self, mock_datetime):
+        now = datetime(2026, 6, 5, 14, 23, 0, tzinfo=TZ_BEIJING)
+        mock_datetime.now.return_value = now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        expired_ts = (now - timedelta(minutes=120)).isoformat()
+        fallback_doc = MagicMock()
+        fallback_doc.to_dict.return_value = {
+            "fund_code": "513100",
+            "level": "提醒",
+            "timestamp": expired_ts,
+        }
+
+        indexed_query = MagicMock()
+        indexed_query.where.return_value = indexed_query
+        indexed_query.order_by.return_value = indexed_query
+        indexed_query.limit.return_value = indexed_query
+        indexed_query.stream.side_effect = Exception("The query requires an index")
+
+        fallback_query = MagicMock()
+        fallback_query.where.return_value = fallback_query
+        fallback_query.stream.return_value = [fallback_doc]
+
+        collection = MagicMock()
+        collection.where.side_effect = [indexed_query, fallback_query]
+
+        db = MagicMock()
+        db.collection.return_value = collection
+
+        result = is_in_cooldown("513100", "提醒", 60, db)
+
+        assert result is False
+
+
 class TestIsInCooldownNoRecords:
     """No notification records should return False (not in cooldown)."""
 
