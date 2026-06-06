@@ -9,4 +9,4 @@ DEPLOY_WORKFLOW_PATH = (
 def test_deploy_workflow_publishes_firestore_indexes():
     workflow = DEPLOY_WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "firestore:indexes" in workflow
+    assert "deploy_firestore_indexes.py" in workflow

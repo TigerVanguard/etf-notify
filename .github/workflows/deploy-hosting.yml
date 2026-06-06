@@ -21,7 +21,13 @@ jobs:
       - run: |
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only hosting,firestore:indexes --project etf-notify-app
+          firebase deploy --only hosting --project etf-notify-app
+      - name: Deploy Firestore indexes
+        run: |
+          python -m pip install google-auth requests
+          python worker/deploy_firestore_indexes.py
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
       - name: Pre-deploy build verification
         working-directory: web
         run: |
