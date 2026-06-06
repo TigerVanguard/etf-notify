@@ -21,7 +21,7 @@ jobs:
       - run: |
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only hosting --project etf-notify-app
+          firebase deploy --only hosting,firestore:indexes --project etf-notify-app
       - name: Pre-deploy build verification
         working-directory: web
         run: |
