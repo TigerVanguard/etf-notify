@@ -2,16 +2,21 @@ name: ETF Monitor
 
 on:
   schedule:
-    # UTC 02:03~05:53 = Beijing 10:03~13:53.
-    # Offset from :00/:10 boundaries to reduce GitHub schedule delays/drops.
-    - cron: '3,13,23,33,43,53 2-5 * * 1-5'
-    # UTC 06:03~06:23 = Beijing 14:03~14:23.
-    - cron: '3,13,23 6 * * 1-5'
+    # Backup start points. The job loops every 10 minutes until Beijing 15:00.
+    # UTC 02:03/02:33 = Beijing 10:03/10:33.
+    - cron: '3,33 2 * * 1-5'
+    # UTC 03:03/05:03/06:03 = Beijing 11:03/13:03/14:03.
+    - cron: '3 3,5,6 * * 1-5'
   workflow_dispatch: {}
+
+concurrency:
+  group: etf-monitor-loop-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,7 +24,7 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
       - run: pip install -r worker/requirements.txt
-      - run: python worker/main.py
+      - run: python worker/loop.py
         env:
           FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
           PUSHDEER_KEY: ${{ secrets.PUSHDEER_KEY }}

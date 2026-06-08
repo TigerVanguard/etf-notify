@@ -64,7 +64,9 @@ def is_trading_time() -> bool:
 def build_run_status(now: datetime | None = None) -> dict:
     """Build the initial status document for one worker invocation."""
     now = now or datetime.now(TZ_BEIJING)
-    run_id = os.environ.get("GITHUB_RUN_ID") or now.strftime("%Y%m%d%H%M%S")
+    timestamp = now.strftime("%Y%m%d%H%M%S")
+    github_run_id = os.environ.get("GITHUB_RUN_ID", "")
+    run_id = f"{github_run_id}-{timestamp}" if github_run_id else timestamp
     return {
         "run_id": run_id,
         "date": now.strftime("%Y-%m-%d"),
