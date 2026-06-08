@@ -32,6 +32,28 @@ class TestSendPushdeerFailure:
         result = send_pushdeer("test_key", "Title", "Body")
         assert result is False
 
+    @patch("notifier.requests.get")
+    def test_pushdeer_business_error_returns_false(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"code": 1, "error": "invalid pushkey"}
+        mock_get.return_value = mock_resp
+
+        result = send_pushdeer("test_key", "Title", "Body")
+
+        assert result is False
+
+    @patch("notifier.requests.get")
+    def test_invalid_json_returns_false(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.side_effect = ValueError("not json")
+        mock_get.return_value = mock_resp
+
+        result = send_pushdeer("test_key", "Title", "Body")
+
+        assert result is False
+
     def test_empty_key_returns_false(self):
         result = send_pushdeer("", "Title", "Body")
         assert result is False
@@ -44,6 +66,7 @@ class TestSendPushdeerSuccess:
     def test_successful_push(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"code": 0}
         mock_get.return_value = mock_resp
 
         result = send_pushdeer("PDU_test_key", "[紧急] 纳指ETF 跌幅 -3.2%", "详细内容")
@@ -57,6 +80,7 @@ class TestSendPushdeerSuccess:
     def test_params_format(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"code": 0}
         mock_get.return_value = mock_resp
 
         send_pushdeer("my_key", "Test Title", "Test Content")

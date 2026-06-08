@@ -23,6 +23,10 @@ def send_pushdeer(key: str, title: str, content: str) -> bool:
         }
         resp = requests.get(PUSHDEER_API, params=params, timeout=10)
         resp.raise_for_status()
+        payload = resp.json()
+        if payload.get("code") != 0:
+            logger.error("PushDeer 业务失败: title=%s response=%s", title, payload)
+            return False
         logger.info("PushDeer 推送成功: %s", title)
         return True
     except Exception:

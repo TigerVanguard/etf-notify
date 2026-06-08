@@ -1,0 +1,22 @@
+name: ETF Monitor Health Check
+
+on:
+  schedule:
+    # UTC 07:10 = Beijing 15:10, after the monitor window.
+    - cron: '10 7 * * 1-5'
+  workflow_dispatch: {}
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r worker/requirements.txt
+      - run: python worker/health_check.py
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+          PUSHDEER_KEY: ${{ secrets.PUSHDEER_KEY }}

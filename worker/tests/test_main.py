@@ -23,6 +23,14 @@ DEFAULT_CONFIG = {
     "fcm_enabled": True,
 }
 
+TRADING_WINDOW_STATUS = {
+    "current_time_bj": "2026-06-08T11:00:00+08:00",
+    "date": "2026-06-08",
+    "is_workday": True,
+    "in_monitor_window": True,
+    "skip_reason": None,
+}
+
 
 def _make_quote(code, name, price, prev_close, change_pct):
     return {
@@ -41,54 +49,70 @@ def _make_quote(code, name, price, prev_close, change_pct):
 class TestTradingTimeWeekend:
     """TC-05: Mock weekend, verify run() returns early without doing anything."""
 
+    @patch("main.record_run_status")
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
     @patch("main.datetime")
-    def test_weekend_skips_execution(self, mock_dt, mock_workday, mock_firebase):
+    def test_weekend_skips_execution(self, mock_dt, mock_workday, mock_firebase, mock_status):
         sunday = datetime(2026, 5, 31, 11, 0, 0, tzinfo=TZ_BEIJING)
         mock_dt.now.return_value = sunday
         mock_workday.return_value = False
+        mock_firebase.return_value = MagicMock()
 
         from main import run
         run()
 
-        mock_firebase.assert_not_called()
+        mock_firebase.assert_called_once()
+        status = mock_status.call_args[0][1]
+        assert status["final_status"] == "skipped"
+        assert status["skip_reason"] == "non_workday"
 
+    @patch("main.record_run_status")
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
     @patch("main.datetime")
-    def test_saturday_skips_execution(self, mock_dt, mock_workday, mock_firebase):
+    def test_saturday_skips_execution(self, mock_dt, mock_workday, mock_firebase, mock_status):
         saturday = datetime(2026, 5, 30, 11, 0, 0, tzinfo=TZ_BEIJING)
         mock_dt.now.return_value = saturday
         mock_workday.return_value = False
+        mock_firebase.return_value = MagicMock()
 
         from main import run
         run()
 
-        mock_firebase.assert_not_called()
+        mock_firebase.assert_called_once()
+        status = mock_status.call_args[0][1]
+        assert status["final_status"] == "skipped"
+        assert status["skip_reason"] == "non_workday"
 
 
 class TestTradingTimeHoliday:
     """TC-05: Mock Chinese holiday (e.g. National Day), verify no execution."""
 
+    @patch("main.record_run_status")
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
     @patch("main.datetime")
-    def test_national_day_skips(self, mock_dt, mock_workday, mock_firebase):
+    def test_national_day_skips(self, mock_dt, mock_workday, mock_firebase, mock_status):
         national_day = datetime(2026, 10, 1, 11, 0, 0, tzinfo=TZ_BEIJING)
         mock_dt.now.return_value = national_day
         mock_workday.return_value = False
+        mock_firebase.return_value = MagicMock()
 
         from main import run
         run()
 
-        mock_firebase.assert_not_called()
+        mock_firebase.assert_called_once()
+        status = mock_status.call_args[0][1]
+        assert status["final_status"] == "skipped"
+        assert status["skip_reason"] == "non_workday"
 
 
 class TestNormalTrigger:
     """TC-01: Trading time + drop -3.5% + no cooldown → notifications sent."""
 
     @patch("main.save_snapshot")
+    @patch("main.record_run_status")
     @patch("main.record_notification")
     @patch("main.send_fcm")
     @patch("main.send_pushdeer")
@@ -96,12 +120,12 @@ class TestNormalTrigger:
     @patch("main.fetch_etf_quotes")
     @patch("main.load_config")
     @patch("main.init_firebase")
-    @patch("main.is_trading_time")
+    @patch("main.get_monitor_window_status")
     def test_urgent_trigger_sends_both_channels(
-        self, mock_trading, mock_firebase, mock_config, mock_quotes,
-        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_snapshot
+        self, mock_window, mock_firebase, mock_config, mock_quotes,
+        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_status, mock_snapshot
     ):
-        mock_trading.return_value = True
+        mock_window.return_value = dict(TRADING_WINDOW_STATUS)
         mock_firebase.return_value = MagicMock()
         mock_config.return_value = dict(DEFAULT_CONFIG)
         mock_quotes.return_value = _make_quote(
@@ -124,12 +148,14 @@ class TestNormalTrigger:
         assert record_kwargs["change_pct"] == -3.5
         assert "pushdeer" in record_kwargs["channels"]
         assert "fcm" in record_kwargs["channels"]
+        assert mock_status.call_args[0][1]["final_status"] == "completed"
 
 
 class TestMultiLevelTrigger:
     """TC-02: Two consecutive runs with escalating drops both notify."""
 
     @patch("main.save_snapshot")
+    @patch("main.record_run_status")
     @patch("main.record_notification")
     @patch("main.send_fcm")
     @patch("main.send_pushdeer")
@@ -137,12 +163,12 @@ class TestMultiLevelTrigger:
     @patch("main.fetch_etf_quotes")
     @patch("main.load_config")
     @patch("main.init_firebase")
-    @patch("main.is_trading_time")
+    @patch("main.get_monitor_window_status")
     def test_escalating_levels_both_notify(
-        self, mock_trading, mock_firebase, mock_config, mock_quotes,
-        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_snapshot
+        self, mock_window, mock_firebase, mock_config, mock_quotes,
+        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_status, mock_snapshot
     ):
-        mock_trading.return_value = True
+        mock_window.return_value = dict(TRADING_WINDOW_STATUS)
         mock_firebase.return_value = MagicMock()
         mock_config.return_value = dict(DEFAULT_CONFIG)
         mock_cooldown.return_value = False
@@ -179,6 +205,7 @@ class TestConfigChange:
     """TC-08: Different Firestore config (modified thresholds) is respected."""
 
     @patch("main.save_snapshot")
+    @patch("main.record_run_status")
     @patch("main.record_notification")
     @patch("main.send_fcm")
     @patch("main.send_pushdeer")
@@ -186,12 +213,12 @@ class TestConfigChange:
     @patch("main.fetch_etf_quotes")
     @patch("main.load_config")
     @patch("main.init_firebase")
-    @patch("main.is_trading_time")
+    @patch("main.get_monitor_window_status")
     def test_custom_threshold_respected(
-        self, mock_trading, mock_firebase, mock_config, mock_quotes,
-        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_snapshot
+        self, mock_window, mock_firebase, mock_config, mock_quotes,
+        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_status, mock_snapshot
     ):
-        mock_trading.return_value = True
+        mock_window.return_value = dict(TRADING_WINDOW_STATUS)
         mock_firebase.return_value = MagicMock()
 
         custom_config = dict(DEFAULT_CONFIG)
@@ -216,6 +243,7 @@ class TestConfigChange:
         assert record_kwargs["level_name"] == "自定义提醒"
 
     @patch("main.save_snapshot")
+    @patch("main.record_run_status")
     @patch("main.record_notification")
     @patch("main.send_fcm")
     @patch("main.send_pushdeer")
@@ -223,12 +251,12 @@ class TestConfigChange:
     @patch("main.fetch_etf_quotes")
     @patch("main.load_config")
     @patch("main.init_firebase")
-    @patch("main.is_trading_time")
+    @patch("main.get_monitor_window_status")
     def test_higher_threshold_no_trigger(
-        self, mock_trading, mock_firebase, mock_config, mock_quotes,
-        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_snapshot
+        self, mock_window, mock_firebase, mock_config, mock_quotes,
+        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_status, mock_snapshot
     ):
-        mock_trading.return_value = True
+        mock_window.return_value = dict(TRADING_WINDOW_STATUS)
         mock_firebase.return_value = MagicMock()
 
         strict_config = dict(DEFAULT_CONFIG)
@@ -248,40 +276,88 @@ class TestConfigChange:
         mock_pushdeer.assert_not_called()
         mock_fcm.assert_not_called()
         mock_record.assert_not_called()
+        assert mock_status.call_args[0][1]["final_status"] == "completed"
+
+
+class TestDeliveryFailure:
+    """Triggered thresholds must fail the run when all delivery channels fail."""
+
+    @patch("main.save_snapshot")
+    @patch("main.record_run_status")
+    @patch("main.record_notification")
+    @patch("main.send_fcm")
+    @patch("main.send_pushdeer")
+    @patch("main.is_in_cooldown")
+    @patch("main.fetch_etf_quotes")
+    @patch("main.load_config")
+    @patch("main.init_firebase")
+    @patch("main.get_monitor_window_status")
+    def test_triggered_run_fails_when_no_channel_succeeds(
+        self, mock_window, mock_firebase, mock_config, mock_quotes,
+        mock_cooldown, mock_pushdeer, mock_fcm, mock_record, mock_status, mock_snapshot
+    ):
+        mock_window.return_value = dict(TRADING_WINDOW_STATUS)
+        mock_firebase.return_value = MagicMock()
+        mock_config.return_value = dict(DEFAULT_CONFIG)
+        mock_quotes.return_value = _make_quote(
+            "159941", "纳指ETF", 1.856, 1.917, -3.5
+        )
+        mock_cooldown.return_value = False
+        mock_pushdeer.return_value = False
+        mock_fcm.return_value = False
+
+        from main import run
+        with pytest.raises(RuntimeError, match="推送失败"):
+            run()
+
+        mock_record.assert_not_called()
+        mock_snapshot.assert_called_once()
+        assert mock_status.call_args[0][1]["final_status"] == "failed"
 
 
 class TestOutsideTradingHours:
     """Test that run() respects the monitoring window and GitHub delay grace."""
 
+    @patch("main.record_run_status")
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
     @patch("main.datetime")
-    def test_early_morning_skips(self, mock_dt, mock_workday, mock_firebase):
+    def test_early_morning_skips(self, mock_dt, mock_workday, mock_firebase, mock_status):
         mock_dt.now.return_value = datetime(2026, 5, 28, 8, 0, 0, tzinfo=TZ_BEIJING)
         mock_workday.return_value = True
+        mock_firebase.return_value = MagicMock()
 
         from main import run
         run()
 
-        mock_firebase.assert_not_called()
+        mock_firebase.assert_called_once()
+        status = mock_status.call_args[0][1]
+        assert status["final_status"] == "skipped"
+        assert status["skip_reason"] == "outside_monitor_window"
 
+    @patch("main.record_run_status")
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
     @patch("main.datetime")
-    def test_evening_skips(self, mock_dt, mock_workday, mock_firebase):
+    def test_evening_skips(self, mock_dt, mock_workday, mock_firebase, mock_status):
         mock_dt.now.return_value = datetime(2026, 5, 28, 16, 0, 0, tzinfo=TZ_BEIJING)
         mock_workday.return_value = True
+        mock_firebase.return_value = MagicMock()
 
         from main import run
         run()
 
-        mock_firebase.assert_not_called()
+        mock_firebase.assert_called_once()
+        status = mock_status.call_args[0][1]
+        assert status["final_status"] == "skipped"
+        assert status["skip_reason"] == "outside_monitor_window"
 
+    @patch("main.record_run_status")
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
     @patch("main.datetime")
     def test_github_schedule_delay_grace_runs_until_15_00(
-        self, mock_dt, mock_workday, mock_firebase
+        self, mock_dt, mock_workday, mock_firebase, mock_status
     ):
         mock_dt.now.return_value = datetime(2026, 6, 8, 14, 45, 0, tzinfo=TZ_BEIJING)
         mock_workday.return_value = True
@@ -295,14 +371,19 @@ class TestOutsideTradingHours:
 
         mock_firebase.assert_called_once()
 
+    @patch("main.record_run_status")
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
     @patch("main.datetime")
-    def test_after_delay_grace_skips(self, mock_dt, mock_workday, mock_firebase):
+    def test_after_delay_grace_skips(self, mock_dt, mock_workday, mock_firebase, mock_status):
         mock_dt.now.return_value = datetime(2026, 6, 8, 15, 1, 0, tzinfo=TZ_BEIJING)
         mock_workday.return_value = True
+        mock_firebase.return_value = MagicMock()
 
         from main import run
         run()
 
-        mock_firebase.assert_not_called()
+        mock_firebase.assert_called_once()
+        status = mock_status.call_args[0][1]
+        assert status["final_status"] == "skipped"
+        assert status["skip_reason"] == "outside_monitor_window"
