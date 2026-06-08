@@ -251,7 +251,7 @@ class TestConfigChange:
 
 
 class TestOutsideTradingHours:
-    """Test that run() does nothing outside 10:00-14:30."""
+    """Test that run() respects the monitoring window and GitHub delay grace."""
 
     @patch("main.init_firebase")
     @patch("main.chinese_calendar.is_workday")
@@ -270,6 +270,36 @@ class TestOutsideTradingHours:
     @patch("main.datetime")
     def test_evening_skips(self, mock_dt, mock_workday, mock_firebase):
         mock_dt.now.return_value = datetime(2026, 5, 28, 16, 0, 0, tzinfo=TZ_BEIJING)
+        mock_workday.return_value = True
+
+        from main import run
+        run()
+
+        mock_firebase.assert_not_called()
+
+    @patch("main.init_firebase")
+    @patch("main.chinese_calendar.is_workday")
+    @patch("main.datetime")
+    def test_github_schedule_delay_grace_runs_until_15_00(
+        self, mock_dt, mock_workday, mock_firebase
+    ):
+        mock_dt.now.return_value = datetime(2026, 6, 8, 14, 45, 0, tzinfo=TZ_BEIJING)
+        mock_workday.return_value = True
+
+        from main import run
+        with (
+            patch("main.load_config", return_value={"funds": []}),
+            patch("main.fetch_etf_quotes"),
+        ):
+            run()
+
+        mock_firebase.assert_called_once()
+
+    @patch("main.init_firebase")
+    @patch("main.chinese_calendar.is_workday")
+    @patch("main.datetime")
+    def test_after_delay_grace_skips(self, mock_dt, mock_workday, mock_firebase):
+        mock_dt.now.return_value = datetime(2026, 6, 8, 15, 1, 0, tzinfo=TZ_BEIJING)
         mock_workday.return_value = True
 
         from main import run

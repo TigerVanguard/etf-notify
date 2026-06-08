@@ -31,10 +31,10 @@ def is_trading_time() -> bool:
     hour, minute = now.hour, now.minute
     current_minutes = hour * 60 + minute
     start_minutes = 10 * 60       # 10:00
-    end_minutes = 14 * 60 + 30    # 14:30
+    end_minutes = 15 * 60         # 15:00, allows delayed GitHub cron runs
 
     if not (start_minutes <= current_minutes <= end_minutes):
-        logger.info("当前时间 %02d:%02d 不在交易时段 (10:00~14:30)，跳过", hour, minute)
+        logger.info("当前时间 %02d:%02d 不在监控时段 (10:00~15:00)，跳过", hour, minute)
         return False
 
     return True
