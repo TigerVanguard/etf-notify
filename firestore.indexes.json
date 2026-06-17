@@ -6,15 +6,15 @@
       "fields": [
         {
           "fieldPath": "fund_code",
-          "mode": "ASCENDING"
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "level",
-          "mode": "ASCENDING"
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "timestamp",
-          "mode": "DESCENDING"
+          "order": "DESCENDING"
         }
       ]
     }

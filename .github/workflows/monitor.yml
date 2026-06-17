@@ -2,11 +2,11 @@ name: ETF Monitor
 
 on:
   schedule:
-    # Backup start points. The job loops every 10 minutes until Beijing 15:00.
-    # UTC 02:03/02:33 = Beijing 10:03/10:33.
-    - cron: '3,33 2 * * 1-5'
-    # UTC 03:03/05:03/06:03 = Beijing 11:03/13:03/14:03.
-    - cron: '3 3,5,6 * * 1-5'
+    # Start early to absorb GitHub Actions cron delay (can be 1-5 hours).
+    # UTC 00:00 = Beijing 08:00. Even with 2h delay, loop starts by 10:00.
+    - cron: '0 0 * * 1-5'
+    # Backup trigger in case first one is delayed too much.
+    - cron: '0 1 * * 1-5'
   workflow_dispatch: {}
 
 concurrency:
@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
