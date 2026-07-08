@@ -51,7 +51,6 @@ etf-notify/
 │   └── superpowers/specs/
 │       └── 2026-05-30-etf-notify-design.md  # 设计文档
 ├── worker/                            # Python 监控服务
-│   ├── loop.py                        # 长跑循环入口（等到 10:00，每10分钟运行一次直到 15:00）
 │   ├── main.py                        # 单次监控入口
 │   ├── config.py                      # Firestore 配置读取
 │   ├── market_data.py                 # AkShare 行情获取
@@ -99,5 +98,5 @@ etf-notify/
 - 去重: 冷却时间（可配置分钟数）
 - 推送: FCM + PushDeer 双通道
 - 存储: Firestore
-- 调度: GitHub Actions 长跑 Job（开盘前启动，loop.py 内部每10分钟循环直到 15:00；受 6 小时硬限制约束，UTC 01:45 起跑 + 每小时备用触发）
+- 调度: 外部定时器（cron-job.org）每10分钟调用 workflow_dispatch API 触发短 Job（每次运行 main.py 一遍，约1-2分钟）；GitHub schedule cron 仅作每30分钟的兜底备份（可能延迟数小时）
 - 节假日: chinese-calendar 库

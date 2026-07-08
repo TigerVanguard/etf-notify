@@ -40,12 +40,10 @@ def _scheduled_beijing_minutes() -> list[int]:
 
 
 def test_monitor_schedule_only_covers_trading_window():
-    # The workflow runs loop.py, which waits until the 10:00 window opens if
-    # started early and exits immediately if trading is over. The primary
-    # trigger fires at Beijing 09:45 (15 min before open) with hourly backups,
-    # so triggers may start up to 15 minutes before the window but must never
-    # fire after the 15:00 window end.
-    earliest = 9 * 60 + 45
+    # The primary trigger is an external scheduler calling workflow_dispatch.
+    # The cron entries are best-effort backups and must all fall inside the
+    # Beijing 10:00-15:00 monitor window (main.py skips runs outside it).
+    earliest = 10 * 60
     latest = 15 * 60
 
     scheduled = _scheduled_beijing_minutes()

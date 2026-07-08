@@ -20,3 +20,5 @@ jobs:
         env:
           FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
           PUSHDEER_KEY: ${{ secrets.PUSHDEER_KEY }}
+          # External scheduler yields ~27 in-window runs/day; alert below 20.
+          HEALTH_MIN_SUCCESS_RUNS: '20'
