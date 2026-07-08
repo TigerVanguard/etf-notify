@@ -15,9 +15,13 @@ type MonitorStatus = "active" | "inactive" | "error";
 function getMonitorStatus(snapshot: Snapshot | null): MonitorStatus {
   if (!snapshot) return "inactive";
 
+  // Trade hours are defined in Beijing time (UTC+8), independent of device timezone
   const now = new Date();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
+  const beijingTime = new Date(
+    now.getTime() + (8 * 60 + now.getTimezoneOffset()) * 60000
+  );
+  const hour = beijingTime.getHours();
+  const minute = beijingTime.getMinutes();
   const currentMinutes = hour * 60 + minute;
   const isTradeTime = currentMinutes >= 600 && currentMinutes <= 870; // 10:00~14:30
 

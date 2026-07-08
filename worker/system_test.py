@@ -23,6 +23,14 @@ def run_system_test() -> None:
     run_id = os.environ.get("GITHUB_RUN_ID") or now.strftime("%Y%m%d%H%M%S")
 
     db = init_firebase()
+
+    # Legacy cleanup: the key used to be stored in the world-readable config doc.
+    from google.cloud import firestore as gcf
+    db.collection("config").document("settings").update(
+        {"pushdeer_key": gcf.DELETE_FIELD}
+    )
+    logger.info("已清理 config/settings 中的遗留 pushdeer_key 字段")
+
     config = load_config(db)
     funds = [fund for fund in config.get("funds", []) if fund.get("enabled", True)]
     if not funds:
@@ -51,7 +59,8 @@ def run_system_test() -> None:
     }
     db.collection("test_snapshots").document(run_id).set(snapshot)
 
-    pushdeer_key = os.environ.get("PUSHDEER_KEY") or config.get("pushdeer_key", "")
+    # Firestore is world-readable, so the key must only come from env (GitHub Secrets).
+    pushdeer_key = os.environ.get("PUSHDEER_KEY", "")
     if not pushdeer_key:
         raise RuntimeError("系统测试失败: PUSHDEER_KEY 未配置")
 

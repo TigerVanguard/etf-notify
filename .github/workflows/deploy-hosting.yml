@@ -17,11 +17,7 @@ jobs:
         working-directory: web
       - run: npm run build
         working-directory: web
-      - run: npm install -g firebase-tools
-      - run: |
-          echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/sa.json
-          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only hosting --project etf-notify-app
+      # Verification runs BEFORE deploy so a bad build never goes live.
       - name: Pre-deploy build verification
         working-directory: web
         run: |
@@ -51,3 +47,8 @@ jobs:
             ls -la out/ out/settings/ 2>/dev/null || true
             exit 1
           fi
+      - run: npm install -g firebase-tools
+      - run: |
+          echo '${{ secrets.FIREBASE_CREDENTIALS }}' > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+          firebase deploy --only hosting --project etf-notify-app

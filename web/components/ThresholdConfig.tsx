@@ -13,6 +13,13 @@ export default function ThresholdConfig({
   onSave,
 }: ThresholdConfigProps) {
   const [editingLevels, setEditingLevels] = useState<ThresholdLevel[]>(levels);
+  const [lastSyncedLevels, setLastSyncedLevels] = useState(levels);
+
+  // Reset local state whenever the prop changes (e.g. config reloaded elsewhere)
+  if (levels !== lastSyncedLevels) {
+    setLastSyncedLevels(levels);
+    setEditingLevels(levels);
+  }
 
   function handleChange(index: number, value: string) {
     const num = parseFloat(value);

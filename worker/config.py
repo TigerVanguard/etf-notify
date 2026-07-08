@@ -20,7 +20,6 @@ DEFAULT_CONFIG = {
         {"name": "紧急", "threshold": -3.0, "color": "red"},
     ],
     "cooldown_minutes": 60,
-    "pushdeer_key": "",
     "fcm_enabled": True,
 }
 

@@ -149,7 +149,8 @@ def run():
         funds = config.get("funds", [])
         levels = config.get("levels", [])
         cooldown_minutes = config.get("cooldown_minutes", 60)
-        pushdeer_key = config.get("pushdeer_key", "") or os.environ.get("PUSHDEER_KEY", "")
+        # Firestore is world-readable, so the key must only come from env (GitHub Secrets).
+        pushdeer_key = os.environ.get("PUSHDEER_KEY", "")
         fcm_enabled = config.get("fcm_enabled", True)
 
         enabled_funds = [f for f in funds if f.get("enabled", True)]

@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
-from config import init_firebase, load_config
+from config import init_firebase
 from notifier import send_pushdeer
 
 logging.basicConfig(
@@ -78,8 +78,8 @@ def run_health_check() -> dict:
     if health["healthy"]:
         return health
 
-    config = load_config(db)
-    pushdeer_key = config.get("pushdeer_key", "") or os.environ.get("PUSHDEER_KEY", "")
+    # Firestore is world-readable, so the key must only come from env (GitHub Secrets).
+    pushdeer_key = os.environ.get("PUSHDEER_KEY", "")
     if not pushdeer_key:
         raise RuntimeError("今日监控异常，且 PUSHDEER_KEY 未配置，无法发送系统告警")
 

@@ -12,7 +12,7 @@ PWA 应用：工作日 10:00~14:30 监控国内场内纳指和标普 ETF 跌幅�
 
 - **Python Worker** (`worker/`): AkShare 获取行情 → 门限判断 → FCM + PushDeer 推送
 - **Next.js PWA** (`web/`): 仪表盘展示 + 配置管理界面
-- **GitHub Actions** (`.github/workflows/`): 每10分钟 cron 调度 Worker
+- **GitHub Actions** (`.github/workflows/`): 开盘前启动长跑 Job，Worker 内部每10分钟循环至 15:00
 - **Firestore**: 配置存储 + 行情快照 + 通知记录
 
 ## Constraints
@@ -24,15 +24,15 @@ PWA 应用：工作日 10:00~14:30 监控国内场内纳指和标普 ETF 跌幅�
 
 ## Done When
 
-- [ ] Python Worker 能通过 AkShare 获取行情数据
-- [ ] 门限判断逻辑正确（多级：提醒/警告/紧急）
-- [ ] 冷却时间机制生效
-- [ ] FCM 推送通知到达手机
-- [ ] PushDeer 推送通知到达手机
-- [ ] GitHub Actions cron 在工作日 10:00~14:30 正常触发
-- [ ] PWA 仪表盘正确展示行情和门限状态
-- [ ] PWA 可安装到手机主屏幕
-- [ ] 端到端流程跑通：行情变动 → 检测 → 推送 → 手机收到通知
+- [x] Python Worker 能通过 AkShare 获取行情数据
+- [x] 门限判断逻辑正确（多级：提醒/警告/紧急）
+- [x] 冷却时间机制生效
+- [x] FCM 推送通知到达手机
+- [x] PushDeer 推送通知到达手机
+- [x] GitHub Actions cron 在工作日 10:00~14:30 正常触发
+- [x] PWA 仪表盘正确展示行情和门限状态
+- [x] PWA 可安装到手机主屏幕
+- [x] 端到端流程跑通：行情变动 → 检测 → 推送 → 手机收到通知
 
 ## Stop If
 
@@ -51,21 +51,28 @@ etf-notify/
 │   └── superpowers/specs/
 │       └── 2026-05-30-etf-notify-design.md  # 设计文档
 ├── worker/                            # Python 监控服务
-│   ├── main.py                        # 入口
+│   ├── loop.py                        # 长跑循环入口（等到 10:00，每10分钟运行一次直到 15:00）
+│   ├── main.py                        # 单次监控入口
 │   ├── config.py                      # Firestore 配置读取
 │   ├── market_data.py                 # AkShare 行情获取
 │   ├── threshold.py                   # 门限计算
-│   ├── notifier.py                    # FCM + PushDeer 推送
 │   ├── cooldown.py                    # 冷却时间管理
+│   ├── notifier.py                    # FCM + PushDeer 推送
+│   ├── health_check.py                # 收盘后健康检查（当日无成功运行则 PushDeer 告警）
+│   ├── system_test.py                 # 生产环境系统测试
 │   ├── requirements.txt               # Python 依赖
 │   └── tests/                         # 单元测试
 ├── web/                               # Next.js PWA 前端
-│   ├── app/                           # App Router 页面
+│   ├── app/                           # App Router 页面（仪表盘 + settings + sw.ts）
 │   ├── components/                    # UI 组件
 │   ├── lib/                           # Firebase SDK 封装
-│   └── public/                        # 静态资源 + SW
+│   └── public/                        # 静态资源
 ├── .github/workflows/
-│   └── monitor.yml                    # GitHub Actions cron
+│   ├── monitor.yml                    # 监控主流程（开盘前启动，内部循环）
+│   ├── ci.yml                         # CI：worker 测试 + web 构建
+│   ├── health-check.yml               # 收盘后健康检查
+│   ├── system-test.yml                # 手动触发系统测试
+│   └── deploy-hosting.yml             # 手动触发 Hosting 部署
 └── firebase.json                      # Firebase Hosting 配置
 ```
 
@@ -92,5 +99,5 @@ etf-notify/
 - 去重: 冷却时间（可配置分钟数）
 - 推送: FCM + PushDeer 双通道
 - 存储: Firestore
-- 调度: GitHub Actions cron（每10分钟）
+- 调度: GitHub Actions 长跑 Job（开盘前启动，loop.py 内部每10分钟循环直到 15:00；受 6 小时硬限制约束，UTC 01:45 起跑 + 每小时备用触发）
 - 节假日: chinese-calendar 库

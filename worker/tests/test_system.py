@@ -1,6 +1,10 @@
 """
 System Integration Tests for etf-notify
 Tests real external services (AkShare, PushDeer, Firestore) without mocks.
+
+These tests make live network calls, so they only run when the PUSHDEER_KEY
+environment variable is set (e.g. in CI with secrets). A default local
+`pytest` run skips this whole module.
 """
 import io
 import json
@@ -9,6 +13,8 @@ import os
 import sys
 import traceback
 from datetime import datetime, timedelta, timezone
+
+import pytest
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
@@ -33,7 +39,14 @@ DEFAULT_LEVELS = [
     {"name": "紧急", "threshold": -3.0, "color": "red"},
 ]
 
-PUSHDEER_KEY = "PDU41722TIjKKvPIkTMqNvjnlGXQy3Fp0W9r7cqAo"
+PUSHDEER_KEY = os.environ.get("PUSHDEER_KEY", "")
+
+# Skip the entire module unless explicitly enabled via env: these are live
+# system tests (AkShare / PushDeer / Firestore), not unit tests.
+pytestmark = pytest.mark.skipif(
+    not PUSHDEER_KEY,
+    reason="PUSHDEER_KEY 环境变量未设置，跳过系统集成测试（避免真实网络调用）",
+)
 
 
 def record(test_id, status, details=""):

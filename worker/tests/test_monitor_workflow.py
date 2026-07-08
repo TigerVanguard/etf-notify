@@ -40,12 +40,18 @@ def _scheduled_beijing_minutes() -> list[int]:
 
 
 def test_monitor_schedule_only_covers_trading_window():
-    start = 10 * 60
-    end = 14 * 60 + 30
+    # The workflow runs loop.py, which waits until the 10:00 window opens if
+    # started early and exits immediately if trading is over. The primary
+    # trigger fires at Beijing 09:45 (15 min before open) with hourly backups,
+    # so triggers may start up to 15 minutes before the window but must never
+    # fire after the 15:00 window end.
+    earliest = 9 * 60 + 45
+    latest = 15 * 60
 
     scheduled = _scheduled_beijing_minutes()
 
-    assert all(start <= minute <= end for minute in scheduled)
+    assert scheduled, "monitor workflow should have scheduled triggers"
+    assert all(earliest <= minute < latest for minute in scheduled)
 
 
 def test_monitor_schedule_avoids_busy_ten_minute_boundaries():

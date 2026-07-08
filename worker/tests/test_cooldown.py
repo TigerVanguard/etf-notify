@@ -149,6 +149,28 @@ class TestIsInCooldownIndexFallback:
         assert result is False
 
 
+class TestIsInCooldownQueryFailure:
+    """Firestore query failure must fail-OPEN (return False) so alerts are not silently blocked."""
+
+    def test_query_failure_fails_open(self):
+        failing_query = MagicMock()
+        failing_query.where.return_value = failing_query
+        failing_query.order_by.return_value = failing_query
+        failing_query.limit.return_value = failing_query
+        failing_query.stream.side_effect = Exception("Firestore unavailable")
+
+        db = MagicMock()
+        db.collection.return_value = failing_query
+
+        result = is_in_cooldown("159941", "提醒", 60, db)
+        assert result is False
+
+    def test_bad_timestamp_fails_open(self):
+        db = _mock_db_with_notification("not-a-timestamp")
+        result = is_in_cooldown("159941", "提醒", 60, db)
+        assert result is False
+
+
 class TestIsInCooldownNoRecords:
     """No notification records should return False (not in cooldown)."""
 

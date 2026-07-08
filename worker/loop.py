@@ -80,7 +80,13 @@ def run_loop() -> None:
         iteration += 1
         now = datetime.now(TZ_BEIJING)
         logger.info("开始第 %d 轮监控: %s", iteration, now.isoformat())
-        run()
+        try:
+            run()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            # One transient failure must not kill the rest of the day's loop.
+            logger.exception("第 %d 轮监控执行失败，继续下一轮", iteration)
 
         now = datetime.now(TZ_BEIJING)
         remaining = seconds_until(now, end_hour, end_minute)

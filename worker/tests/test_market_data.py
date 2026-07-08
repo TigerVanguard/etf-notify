@@ -105,3 +105,64 @@ class TestFetchEtfQuotesSuccess:
     def test_empty_fund_codes_returns_empty(self):
         result = fetch_etf_quotes([])
         assert result == {}
+
+
+class TestFetchEtfQuotesInvalidData:
+    """Bad rows (missing/NaN/zero prices) must be excluded, not returned as zeros."""
+
+    @patch("market_data.ak.fund_etf_spot_em")
+    def test_renamed_price_column_excludes_fund(self, mock_ak):
+        mock_ak.return_value = _make_etf_df([
+            {"代码": "159941", "名称": "纳指ETF", "现价": 1.9, "昨收": 2.0,
+             "涨跌幅": -5.0, "最高": 2.0, "最低": 1.85, "成交量": 100},
+        ])
+        result = fetch_etf_quotes(["159941"])
+        assert result == {}
+
+    @patch("market_data.ak.fund_etf_spot_em")
+    def test_nan_price_excludes_fund(self, mock_ak):
+        mock_ak.return_value = _make_etf_df([
+            {"代码": "159941", "名称": "纳指ETF", "最新价": float("nan"), "昨收": 2.0,
+             "涨跌幅": -5.0, "最高": 2.0, "最低": 1.85, "成交量": 100},
+        ])
+        result = fetch_etf_quotes(["159941"])
+        assert result == {}
+
+    @patch("market_data.ak.fund_etf_spot_em")
+    def test_zero_prev_close_excludes_fund(self, mock_ak):
+        mock_ak.return_value = _make_etf_df([
+            {"代码": "159941", "名称": "纳指ETF", "最新价": 1.9, "昨收": 0,
+             "涨跌幅": -5.0, "最高": 2.0, "最低": 1.85, "成交量": 100},
+        ])
+        result = fetch_etf_quotes(["159941"])
+        assert result == {}
+
+    @patch("market_data.ak.fund_etf_spot_em")
+    def test_negative_price_excludes_fund(self, mock_ak):
+        mock_ak.return_value = _make_etf_df([
+            {"代码": "159941", "名称": "纳指ETF", "最新价": -1.9, "昨收": 2.0,
+             "涨跌幅": -5.0, "最高": 2.0, "最低": 1.85, "成交量": 100},
+        ])
+        result = fetch_etf_quotes(["159941"])
+        assert result == {}
+
+    @patch("market_data.ak.fund_etf_spot_em")
+    def test_bad_row_does_not_block_valid_funds(self, mock_ak):
+        mock_ak.return_value = _make_etf_df([
+            {"代码": "159941", "名称": "纳指ETF", "最新价": float("nan"), "昨收": 2.0,
+             "涨跌幅": -5.0, "最高": 2.0, "最低": 1.85, "成交量": 100},
+            {"代码": "513500", "名称": "标普500ETF", "最新价": 1.5, "昨收": 1.55,
+             "涨跌幅": -3.23, "最高": 1.56, "最低": 1.48, "成交量": 200},
+        ])
+        result = fetch_etf_quotes(["159941", "513500"])
+        assert "159941" not in result
+        assert "513500" in result
+
+    @patch("market_data.ak.fund_etf_spot_em")
+    def test_missing_change_pct_derived_from_prices(self, mock_ak):
+        mock_ak.return_value = _make_etf_df([
+            {"代码": "159941", "名称": "纳指ETF", "最新价": 1.9, "昨收": 2.0,
+             "涨跌幅": float("nan"), "最高": 2.0, "最低": 1.85, "成交量": 100},
+        ])
+        result = fetch_etf_quotes(["159941"])
+        assert result["159941"]["change_pct"] == pytest.approx(-5.0)

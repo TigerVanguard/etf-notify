@@ -1,8 +1,22 @@
 import logging
+import math
 
 import akshare as ak
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_float(value) -> float | None:
+    """Parse a numeric cell; return None when missing/NaN/unparseable."""
+    if value is None:
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(result):
+        return None
+    return result
 
 
 def fetch_etf_quotes(fund_codes: list[str]) -> dict:
@@ -43,12 +57,28 @@ def fetch_etf_quotes(fund_codes: list[str]) -> dict:
                 continue
 
             row = row.iloc[0]
-            price = float(row.get("最新价", 0))
-            prev_close = float(row.get("昨收", 0))
-            change_pct = float(row.get("涨跌幅", 0))
-            high = float(row.get("最高", 0))
-            low = float(row.get("最低", 0))
-            volume = int(row.get("成交量", 0))
+            price = _parse_float(row.get("最新价"))
+            prev_close = _parse_float(row.get("昨收"))
+
+            # Bad price data must not silently become zeros in Firestore
+            # (zeros can suppress alerts); exclude the fund instead.
+            if price is None or prev_close is None or price <= 0 or prev_close <= 0:
+                logger.warning(
+                    "基金 %s 行情数据无效（price=%s, prev_close=%s），跳过该基金",
+                    code,
+                    row.get("最新价"),
+                    row.get("昨收"),
+                )
+                continue
+
+            change_pct = _parse_float(row.get("涨跌幅"))
+            if change_pct is None:
+                change_pct = (price - prev_close) / prev_close * 100
+
+            high = _parse_float(row.get("最高")) or 0
+            low = _parse_float(row.get("最低")) or 0
+            volume_raw = _parse_float(row.get("成交量"))
+            volume = int(volume_raw) if volume_raw is not None else 0
 
             result[code] = {
                 "name": str(row.get("名称", "")),

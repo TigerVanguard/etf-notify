@@ -9,9 +9,9 @@ def test_notifications_cooldown_query_has_composite_index():
     config = json.loads(INDEXES_PATH.read_text(encoding="utf-8"))
 
     expected_fields = [
-        {"fieldPath": "fund_code", "mode": "ASCENDING"},
-        {"fieldPath": "level", "mode": "ASCENDING"},
-        {"fieldPath": "timestamp", "mode": "DESCENDING"},
+        {"fieldPath": "fund_code", "order": "ASCENDING"},
+        {"fieldPath": "level", "order": "ASCENDING"},
+        {"fieldPath": "timestamp", "order": "DESCENDING"},
     ]
 
     assert any(

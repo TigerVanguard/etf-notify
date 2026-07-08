@@ -77,12 +77,13 @@ def is_in_cooldown(
                 db,
             )
         except Exception:
+            # Fail-open: a duplicate alert is acceptable, a missed alert is not.
             logger.warning(
-                "检查冷却时间 fallback 失败（基金 %s），返回冷却中以防刷屏",
+                "冷却查询失败，为避免漏报按未冷却处理，可能出现重复通知（基金 %s）",
                 fund_code,
                 exc_info=True,
             )
-            return True
+            return False
 
     if not last_notification:
         return False
@@ -102,12 +103,13 @@ def is_in_cooldown(
             return True
         return False
     except Exception:
+        # Fail-open: a duplicate alert is acceptable, a missed alert is not.
         logger.warning(
-            "解析冷却时间失败（基金 %s），返回冷却中以防刷屏",
+            "冷却查询失败，为避免漏报按未冷却处理，可能出现重复通知（基金 %s）",
             fund_code,
             exc_info=True,
         )
-        return True
+        return False
 
 
 def record_notification(

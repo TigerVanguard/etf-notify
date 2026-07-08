@@ -37,7 +37,6 @@ export interface AppConfig {
   funds: FundConfig[];
   levels: ThresholdLevel[];
   cooldown_minutes: number;
-  pushdeer_key: string;
   fcm_enabled: boolean;
 }
 

@@ -2,13 +2,24 @@ name: ETF Monitor
 
 on:
   schedule:
-    # Start early to absorb GitHub Actions cron delay (can be 1-5 hours).
-    # UTC 00:00 = Beijing 08:00. Even with 2h delay, loop starts by 10:00.
-    - cron: '0 0 * * 1-5'
-    # Backup trigger in case first one is delayed too much.
-    - cron: '0 1 * * 1-5'
+    # GitHub-hosted runners kill jobs at the 6-hour hard limit, so the job must
+    # start no earlier than UTC 01:00 to survive until UTC 07:00 (Beijing 15:00).
+    # Primary trigger: UTC 01:45 = Beijing 09:45, just before trading monitor
+    # window opens at 10:00. Max runtime 01:45 -> 07:00 = 5h15m, safely under 6h.
+    - cron: '45 1 * * 1-5'
+    # Hourly backup triggers in case the primary cron is delayed or dropped
+    # (GitHub cron delays can be 1-5 hours). loop.py waits until Beijing 10:00
+    # if it starts early, and exits immediately if trading is already over, so
+    # a backup that fires while the primary is still running just queues behind
+    # it (concurrency below) and exits quickly.
+    - cron: '45 2 * * 1-5'
+    - cron: '45 3 * * 1-5'
+    - cron: '45 4 * * 1-5'
+    - cron: '45 5 * * 1-5'
   workflow_dispatch: {}
 
+# Backup triggers queue behind the running job instead of cancelling it; when
+# they finally run, loop.py sees trading is over and exits immediately.
 concurrency:
   group: etf-monitor-loop-${{ github.ref }}
   cancel-in-progress: false
@@ -16,7 +27,8 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    # Under the 6-hour (360 min) hard cap; worst case runtime is 5h15m.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6

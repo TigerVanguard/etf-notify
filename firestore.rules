@@ -1,16 +1,19 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // PWA client reads and writes config; secrets are not stored here
     match /config/{document} {
       allow read, write: if true;
     }
+    // Only the worker (Admin SDK, bypasses rules) writes snapshots
     match /snapshots/{document} {
       allow read: if true;
-      allow write: if true;
+      allow write: if false;
     }
+    // Only the worker writes notification records
     match /notifications/{document} {
       allow read: if true;
-      allow write: if true;
+      allow write: if false;
     }
   }
 }

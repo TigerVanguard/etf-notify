@@ -52,12 +52,12 @@ def test_build_alert_contains_reason_chain():
     assert "最后错误: 推送失败" in body
 
 
+@patch.dict(os.environ, {"PUSHDEER_KEY": "PDU_test"})
 @patch("health_check.send_pushdeer")
-@patch("health_check.load_config")
 @patch("health_check.init_firebase")
 @patch("health_check.today_bj")
 def test_run_health_check_sends_alert_when_no_successful_run(
-    mock_today, mock_firebase, mock_config, mock_pushdeer
+    mock_today, mock_firebase, mock_pushdeer
 ):
     mock_today.return_value = "2026-06-08"
     db = MagicMock()
@@ -65,7 +65,6 @@ def test_run_health_check_sends_alert_when_no_successful_run(
         FakeDoc({"date": "2026-06-08", "final_status": "failed", "in_monitor_window": True})
     ]
     mock_firebase.return_value = db
-    mock_config.return_value = {"pushdeer_key": "PDU_test"}
     mock_pushdeer.return_value = True
 
     health = run_health_check()
@@ -93,15 +92,14 @@ def test_run_health_check_does_not_alert_when_successful(
     mock_pushdeer.assert_not_called()
 
 
-@patch("health_check.load_config")
 @patch("health_check.init_firebase")
 @patch("health_check.today_bj")
-def test_run_health_check_fails_without_push_key(mock_today, mock_firebase, mock_config):
+def test_run_health_check_fails_without_push_key(mock_today, mock_firebase, monkeypatch):
+    monkeypatch.delenv("PUSHDEER_KEY", raising=False)
     mock_today.return_value = "2026-06-08"
     db = MagicMock()
     db.collection.return_value.where.return_value.stream.return_value = []
     mock_firebase.return_value = db
-    mock_config.return_value = {"pushdeer_key": ""}
 
     with pytest.raises(RuntimeError, match="PUSHDEER_KEY"):
         run_health_check()

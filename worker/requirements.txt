@@ -1,6 +1,6 @@
-akshare
-firebase-admin
-requests
-chinese-calendar
-pytest
-pytest-mock
+akshare==1.18.64
+firebase-admin==7.4.0
+requests==2.32.5
+chinese-calendar==1.11.0
+pytest==9.0.2
+pytest-mock==3.15.1

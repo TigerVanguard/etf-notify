@@ -15,10 +15,12 @@ export default function SettingsPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [pushDeerKey, setPushDeerKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
+  // Ad-hoc test key: used only for the test push request, never persisted
+  const [testKey, setTestKey] = useState("");
+  const [cooldownInput, setCooldownInput] = useState("");
 
   useEffect(() => {
     loadConfig();
@@ -28,8 +30,9 @@ export default function SettingsPage() {
     try {
       const cfg = await getConfig();
       setConfig(cfg);
-      setPushDeerKey(cfg?.pushdeer_key ?? "");
-      if (!cfg) {
+      if (cfg) {
+        setCooldownInput(String(cfg.cooldown_minutes));
+      } else {
         setError("not_initialized");
       }
     } catch (err) {
@@ -41,13 +44,17 @@ export default function SettingsPage() {
   }
 
   const saveConfig = useCallback(
-    async (partial: Partial<AppConfig>) => {
+    async (partial: Partial<AppConfig>): Promise<boolean> => {
       setSaving(true);
+      setSaveError(null);
       try {
         await updateConfig(partial);
         setConfig((prev) => (prev ? { ...prev, ...partial } : prev));
+        return true;
       } catch (err) {
         console.error("Failed to save config:", err);
+        setSaveError("保存失败，请重试");
+        return false;
       } finally {
         setSaving(false);
       }
@@ -78,13 +85,18 @@ export default function SettingsPage() {
     saveConfig({ levels });
   }
 
-  function handleCooldownChange(minutes: number) {
-    if (minutes < 0) return;
-    saveConfig({ cooldown_minutes: minutes });
-  }
-
-  function handlePushDeerKeySave() {
-    saveConfig({ pushdeer_key: pushDeerKey });
+  async function handleCooldownBlur() {
+    if (!config) return;
+    const minutes = parseInt(cooldownInput, 10);
+    if (isNaN(minutes) || minutes < 0) {
+      setCooldownInput(String(config.cooldown_minutes));
+      return;
+    }
+    if (minutes === config.cooldown_minutes) return;
+    const ok = await saveConfig({ cooldown_minutes: minutes });
+    if (!ok) {
+      setCooldownInput(String(config.cooldown_minutes));
+    }
   }
 
   function handleFcmToggle() {
@@ -93,14 +105,14 @@ export default function SettingsPage() {
   }
 
   async function handleTestPush() {
-    if (!pushDeerKey) {
-      setTestResult("请先输入 PushDeer Key");
+    if (!testKey) {
+      setTestResult("请先输入用于测试的 PushDeer Key");
       return;
     }
     setTestResult("发送中...");
     try {
       const resp = await fetch(
-        `https://api2.pushdeer.com/message/push?pushkey=${encodeURIComponent(pushDeerKey)}&text=${encodeURIComponent("[测试] ETF Notify 推送测试成功！")}&type=text`
+        `https://api2.pushdeer.com/message/push?pushkey=${encodeURIComponent(testKey)}&text=${encodeURIComponent("[测试] ETF Notify 推送测试成功！")}&type=text`
       );
       if (resp.ok) {
         setTestResult("测试推送已发送，请检查手机");
@@ -158,9 +170,11 @@ export default function SettingsPage() {
     <div className="px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-white">设置</h1>
-        {saving && (
+        {saving ? (
           <span className="text-blue-400 text-xs">保存中...</span>
-        )}
+        ) : saveError ? (
+          <span className="text-red-400 text-xs">{saveError}</span>
+        ) : null}
       </div>
 
       {/* Fund Management */}
@@ -192,10 +206,9 @@ export default function SettingsPage() {
             <input
               type="number"
               min="0"
-              value={config.cooldown_minutes}
-              onChange={(e) =>
-                handleCooldownChange(parseInt(e.target.value) || 0)
-              }
+              value={cooldownInput}
+              onChange={(e) => setCooldownInput(e.target.value)}
+              onBlur={handleCooldownBlur}
               className="w-20 bg-slate-700 text-white text-sm rounded px-2 py-1 text-right border border-slate-600 focus:border-blue-500 focus:outline-none"
             />
             <span className="text-slate-400 text-sm">分钟</span>
@@ -207,63 +220,6 @@ export default function SettingsPage() {
       <section className="mb-8">
         <h2 className="text-white font-medium text-base mb-3">推送设置</h2>
         <div className="space-y-3">
-          {/* PushDeer Key */}
-          <div className="bg-slate-800/50 rounded-lg p-3 space-y-2">
-            <label className="text-slate-300 text-sm">PushDeer Key</label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type={showKey ? "text" : "password"}
-                  value={pushDeerKey}
-                  onChange={(e) => setPushDeerKey(e.target.value)}
-                  onBlur={handlePushDeerKeySave}
-                  placeholder="PDU..."
-                  className="w-full bg-slate-700 text-white text-sm rounded px-3 py-2 border border-slate-600 focus:border-blue-500 focus:outline-none placeholder-slate-400 pr-10"
-                />
-                <button
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
-                >
-                  {showKey ? (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
           {/* FCM Toggle */}
           <div className="bg-slate-800/50 rounded-lg p-3 flex items-center justify-between">
             <span className="text-slate-300 text-sm">FCM 推送</span>
@@ -282,15 +238,28 @@ export default function SettingsPage() {
           </div>
 
           {/* Test Push */}
-          <button
-            onClick={handleTestPush}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg py-3 transition-colors"
-          >
-            发送测试推送
-          </button>
-          {testResult && (
-            <p className="text-center text-sm text-blue-400">{testResult}</p>
-          )}
+          <div className="bg-slate-800/50 rounded-lg p-3 space-y-2">
+            <label className="text-slate-300 text-sm">测试推送</label>
+            <input
+              type="text"
+              value={testKey}
+              onChange={(e) => setTestKey(e.target.value)}
+              placeholder="输入 PushDeer Key 用于测试"
+              className="w-full bg-slate-700 text-white text-sm rounded px-3 py-2 border border-slate-600 focus:border-blue-500 focus:outline-none placeholder-slate-400"
+            />
+            <p className="text-slate-500 text-xs">
+              推送 Key 保存在 GitHub Secrets 中，此处仅用于临时测试，不会被保存
+            </p>
+            <button
+              onClick={handleTestPush}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg py-3 transition-colors"
+            >
+              发送测试推送
+            </button>
+            {testResult && (
+              <p className="text-center text-sm text-blue-400">{testResult}</p>
+            )}
+          </div>
         </div>
       </section>
     </div>

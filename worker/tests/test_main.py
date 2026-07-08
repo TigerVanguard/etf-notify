@@ -19,9 +19,11 @@ DEFAULT_CONFIG = {
         {"name": "紧急", "threshold": -3.0, "color": "red"},
     ],
     "cooldown_minutes": 60,
-    "pushdeer_key": "PDU_test",
     "fcm_enabled": True,
 }
+
+# PushDeer key now comes exclusively from the environment (GitHub Secrets).
+PUSHDEER_ENV = {"PUSHDEER_KEY": "PDU_test"}
 
 TRADING_WINDOW_STATUS = {
     "current_time_bj": "2026-06-08T11:00:00+08:00",
@@ -111,6 +113,7 @@ class TestTradingTimeHoliday:
 class TestNormalTrigger:
     """TC-01: Trading time + drop -3.5% + no cooldown → notifications sent."""
 
+    @patch.dict(os.environ, PUSHDEER_ENV)
     @patch("main.save_snapshot")
     @patch("main.record_run_status")
     @patch("main.record_notification")
@@ -154,6 +157,7 @@ class TestNormalTrigger:
 class TestMultiLevelTrigger:
     """TC-02: Two consecutive runs with escalating drops both notify."""
 
+    @patch.dict(os.environ, PUSHDEER_ENV)
     @patch("main.save_snapshot")
     @patch("main.record_run_status")
     @patch("main.record_notification")
@@ -204,6 +208,7 @@ class TestMultiLevelTrigger:
 class TestConfigChange:
     """TC-08: Different Firestore config (modified thresholds) is respected."""
 
+    @patch.dict(os.environ, PUSHDEER_ENV)
     @patch("main.save_snapshot")
     @patch("main.record_run_status")
     @patch("main.record_notification")
@@ -242,6 +247,7 @@ class TestConfigChange:
         record_kwargs = mock_record.call_args[1]
         assert record_kwargs["level_name"] == "自定义提醒"
 
+    @patch.dict(os.environ, PUSHDEER_ENV)
     @patch("main.save_snapshot")
     @patch("main.record_run_status")
     @patch("main.record_notification")
@@ -282,6 +288,7 @@ class TestConfigChange:
 class TestDeliveryFailure:
     """Triggered thresholds must fail the run when all delivery channels fail."""
 
+    @patch.dict(os.environ, PUSHDEER_ENV)
     @patch("main.save_snapshot")
     @patch("main.record_run_status")
     @patch("main.record_notification")
