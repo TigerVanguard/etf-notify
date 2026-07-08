@@ -17,7 +17,8 @@ jobs:
       - run: pip install -r worker/requirements.txt
       # No secrets passed on purpose: tests must pass without credentials
       # (network-dependent tests self-skip).
-      - run: python -m pytest worker/tests/ --tb=short
+      # -s avoids a pytest capture bug (ValueError: I/O operation on closed file).
+      - run: python -m pytest worker/tests/ -s --tb=short
 
   web-build:
     runs-on: ubuntu-latest
