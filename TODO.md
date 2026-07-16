@@ -51,5 +51,5 @@
 - [x] Firestore 规则收紧
 - [ ] PushDeer Key 轮换（用户操作）
 - [x] 改为短 Job 模式：workflow_dispatch 外部触发 + 每30分钟 cron 兜底（代码侧完成）
-- [x] 健康检查改为覆盖率判定（当日成功运行 ≥ 20 次才算健康）
-- [ ] 注册 cron-job.org 并配置每10分钟调用 workflow_dispatch API（用户操作，需 GitHub PAT）
+- [x] 健康检查改为覆盖率判定（当日成功运行 ≥ 15 次才算健康，对应每15分钟外部触发）
+- [x] 注册 cron-job.org 并配置每15分钟调用 workflow_dispatch API（已配置，TEST RUN 返回 204，触发链路验证通过）

@@ -98,5 +98,5 @@ etf-notify/
 - 去重: 冷却时间（可配置分钟数）
 - 推送: FCM + PushDeer 双通道
 - 存储: Firestore
-- 调度: 外部定时器（cron-job.org）每10分钟调用 workflow_dispatch API 触发短 Job（每次运行 main.py 一遍，约1-2分钟）；GitHub schedule cron 仅作每30分钟的兜底备份（可能延迟数小时）
+- 调度: 外部定时器（cron-job.org）每15分钟调用 workflow_dispatch API 触发短 Job（每次运行 main.py 一遍，约1-2分钟）；GitHub schedule cron 仅作每30分钟的兜底备份（可能延迟数小时）
 - 节假日: chinese-calendar 库
