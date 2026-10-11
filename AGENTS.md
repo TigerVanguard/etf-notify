@@ -10,7 +10,7 @@ PWA 应用：工作日 10:00~14:30 监控国内场内纳指和标普 ETF 跌幅�
 
 ## Architecture
 
-- **Python Worker** (`worker/`): AkShare 获取行情 → 门限判断 → FCM + PushDeer 推送
+- **Python Worker** (`worker/`): AkShare 获取行情（失败时回退腾讯/新浪行情）→ 门限判断 → FCM + PushDeer 推送
 - **Next.js PWA** (`web/`): 仪表盘展示 + 配置管理界面
 - **GitHub Actions** (`.github/workflows/`): 开盘前启动长跑 Job，Worker 内部每10分钟循环至 15:00
 - **Firestore**: 配置存储 + 行情快照 + 通知记录
@@ -53,7 +53,7 @@ etf-notify/
 ├── worker/                            # Python 监控服务
 │   ├── main.py                        # 单次监控入口
 │   ├── config.py                      # Firestore 配置读取
-│   ├── market_data.py                 # AkShare 行情获取
+│   ├── market_data.py                 # 行情获取（AkShare 为主，腾讯/新浪兜底）
 │   ├── threshold.py                   # 门限计算
 │   ├── cooldown.py                    # 冷却时间管理
 │   ├── notifier.py                    # FCM + PushDeer 推送
@@ -88,11 +88,11 @@ etf-notify/
 - 端到端测试是核心验收标准
 - 使用 pytest + mock 做单元/集成测试
 - 测试计划详见设计文档 Section 7
-- Mock AkShare 返回数据以避免真实 API 调用
+- Mock AkShare 和备用行情源（`market_data.requests.get`）以避免真实 API 调用
 - 测试通知推送时 mock HTTP 请求，验证请求参数
 
 ### Key Decisions Already Made
-- 数据源: AkShare（Python）
+- 数据源: AkShare（Python）为主；缺失的基金依次回退腾讯行情、新浪行情（2026-09-23 起 AkShare 背后的东方财富接口持续 502，曾导致监控中断）
 - 跌幅计算: 相对昨日收盘价
 - 门限: 多级（提醒-1%、警告-2%、紧急-3%），可配置
 - 去重: 冷却时间（可配置分钟数）

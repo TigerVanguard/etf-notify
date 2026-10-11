@@ -39,7 +39,8 @@ def run_system_test() -> None:
     fund_codes = [fund["code"] for fund in funds]
     quotes = fetch_etf_quotes(fund_codes)
     if not quotes:
-        raise RuntimeError("系统测试失败: AkShare 未返回行情")
+        raise RuntimeError("系统测试失败: 所有行情源均未返回数据")
+    sources = ", ".join(sorted({quote.get("source", "?") for quote in quotes.values()}))
 
     levels = config.get("levels", [])
     triggered = []
@@ -66,7 +67,7 @@ def run_system_test() -> None:
 
     title = "[系统测试] ETF Notify 全流程验证"
     body = (
-        f"AkShare 数据获取成功: {len(quotes)} 只基金\n"
+        f"行情获取成功: {len(quotes)} 只基金（来源: {sources}）\n"
         "Firestore 测试快照写入成功\n"
         f"触发门限数量: {len(triggered)}\n"
         f"测试时间: {now.strftime('%Y-%m-%d %H:%M:%S')}"

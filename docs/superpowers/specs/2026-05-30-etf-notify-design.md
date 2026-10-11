@@ -66,7 +66,7 @@
 ```
 
 ### 数据流向
-1. GitHub Actions → Python Worker → AkShare（获取数据）
+1. GitHub Actions → Python Worker → AkShare（获取数据；失败时回退腾讯/新浪行情）
 2. Python Worker → Firestore（写入快照 + 通知记录）
 3. Python Worker → FCM + PushDeer（推送通知）
 4. PWA → Firestore（读取仪表盘数据 + 读写配置）
@@ -79,7 +79,7 @@
 worker/
 ├── main.py              # 入口：编排整体流程
 ├── config.py            # Firestore 配置读取
-├── market_data.py       # AkShare 行情获取
+├── market_data.py       # 行情获取（AkShare 为主，腾讯/新浪兜底）
 ├── threshold.py         # 门限计算 + 触发判断
 ├── notifier.py          # FCM + PushDeer 推送
 ├── cooldown.py          # 冷却时间管理
